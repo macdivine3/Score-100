@@ -17,12 +17,15 @@ interface TaskCardProps {
     task: Task;
     index: number;
     isLast: boolean;
+    onComplete?: () => void;
+    onSkip?: () => void;
 }
 
-const SWIPE_THRESHOLD = -100;
+const SWIPE_THRESHOLD_COMPLETE = -100;
+const SWIPE_THRESHOLD_SKIP = 100;
 
-const TaskCard: React.FC<TaskCardProps> = ({ task, index, isLast }) => {
-    const { completeTask } = useApp();
+const TaskCard: React.FC<TaskCardProps> = ({ task, index, isLast, onComplete, onSkip }) => {
+    const { completeTask, skipTask } = useApp();
     const translateX = useSharedValue(0);
 
     const gradientColors = TASK_GRADIENTS[index % TASK_GRADIENTS.length];
@@ -31,20 +34,34 @@ const TaskCard: React.FC<TaskCardProps> = ({ task, index, isLast }) => {
 
     const handleComplete = () => {
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-        completeTask(task.id);
+        if (onComplete) {
+            onComplete();
+        } else {
+            completeTask(task.id);
+        }
+    };
+
+    const handleSkip = () => {
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+        if (onSkip) {
+            onSkip();
+        } else {
+            skipTask(task.id);
+        }
     };
 
     const pan = Gesture.Pan()
         .activeOffsetX([-20, 20]) // Allow vertical scrolling to take priority
         .onUpdate((e) => {
-            if (e.translationX < 0) {
-                translateX.value = Math.max(e.translationX, -150);
-            }
+            translateX.value = Math.max(Math.min(e.translationX, 150), -150);
         })
         .onEnd((e) => {
-            if (e.translationX < SWIPE_THRESHOLD) {
+            if (e.translationX < SWIPE_THRESHOLD_COMPLETE) {
                 translateX.value = withTiming(-400, { duration: 300 });
                 runOnJS(handleComplete)();
+            } else if (e.translationX > SWIPE_THRESHOLD_SKIP) {
+                translateX.value = withTiming(400, { duration: 300 });
+                runOnJS(handleSkip)();
             } else {
                 translateX.value = withSpring(0);
             }
@@ -54,8 +71,8 @@ const TaskCard: React.FC<TaskCardProps> = ({ task, index, isLast }) => {
         transform: [{ translateX: translateX.value }],
         opacity: interpolate(
             translateX.value,
-            [-400, -200, 0],
-            [0, 0.8, 1],
+            [-400, -200, 0, 200, 400],
+            [0, 0.8, 1, 0.8, 0],
             Extrapolation.CLAMP,
         ),
     }));
@@ -87,7 +104,7 @@ const TaskCard: React.FC<TaskCardProps> = ({ task, index, isLast }) => {
                         <View style={[styles.leftAccentPill, { backgroundColor: dotColor, opacity: 0.4 }]} />
                         <View style={styles.cardContent}>
                             <Text style={[styles.taskName, { textDecorationLine: 'line-through', opacity: 0.5 }]}>{task.name}</Text>
-                            <Text style={[styles.taskTime, { opacity: 0.4 }]}>{task.time}</Text>
+                            <Text style={[styles.taskTime, { opacity: 0.4 }]}>{task.startTime} — {task.endTime}</Text>
                         </View>
                     </View>
                     <Text style={[styles.points, { opacity: 0.5, color: COLORS.success }]}>{task.points} pts</Text>
@@ -101,8 +118,14 @@ const TaskCard: React.FC<TaskCardProps> = ({ task, index, isLast }) => {
             {renderTimeline(dotColor, nextDotColor)}
 
             <View style={styles.cardWrapper}>
+                <View style={styles.skipReveal}>
+                    <Text style={styles.skipRevealText}>↷</Text>
+                    <Text style={styles.skipLabel}>SKIP</Text>
+                </View>
+
                 <View style={styles.swipeReveal}>
                     <Text style={styles.swipeRevealText}>✓</Text>
+                    <Text style={styles.completeLabel}>DONE</Text>
                 </View>
 
                 <GestureDetector gesture={pan}>
@@ -117,7 +140,7 @@ const TaskCard: React.FC<TaskCardProps> = ({ task, index, isLast }) => {
                                 <View style={[styles.leftAccentPill, { backgroundColor: 'rgba(255,255,255,0.4)' }]} />
                                 <View style={styles.cardContent}>
                                     <Text style={styles.taskName} numberOfLines={1}>{task.name}</Text>
-                                    <Text style={styles.taskTime}>{task.time}</Text>
+                                    <Text style={styles.taskTime}>{task.startTime} — {task.endTime}</Text>
                                 </View>
                             </View>
                             <Text style={styles.points}>{task.points} pts</Text>
@@ -198,8 +221,36 @@ const styles = StyleSheet.create({
     },
     swipeRevealText: {
         color: '#fff',
-        fontSize: 28,
+        fontSize: 22,
         fontWeight: '700',
+    },
+    completeLabel: {
+        color: '#fff',
+        fontSize: 8,
+        fontWeight: '800',
+        marginTop: 2,
+    },
+    skipReveal: {
+        position: 'absolute',
+        left: 0,
+        top: 0,
+        bottom: 0,
+        width: 100,
+        justifyContent: 'center',
+        alignItems: 'center',
+        backgroundColor: COLORS.danger,
+        borderRadius: SIZES.radiusMd,
+    },
+    skipRevealText: {
+        color: '#fff',
+        fontSize: 22,
+        fontWeight: '700',
+    },
+    skipLabel: {
+        color: '#fff',
+        fontSize: 8,
+        fontWeight: '800',
+        marginTop: 2,
     },
     card: {
         borderRadius: SIZES.radiusLg,

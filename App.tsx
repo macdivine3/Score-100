@@ -16,10 +16,25 @@ import HomeScreen from './src/screens/HomeScreen';
 import AddTaskScreen from './src/screens/AddTaskScreen';
 import ReflectionScreen from './src/screens/ReflectionScreen';
 import { BottomNavBar } from './src/components';
+import { initializeRecurringNotifications, scheduleAllTaskNotifications } from './src/utils/notifications';
 
 const RootApp: React.FC = () => {
-  const { isLoading } = useApp();
+  const { isLoading, tasks, loopItems } = useApp();
   const [currentScreen, setCurrentScreen] = useState<'home' | 'add_task' | 'reflection'>('home');
+
+  // Initialize recurring notifications (Morning Call + Night Prior) on mount
+  useEffect(() => {
+    if (loopItems.length > 0) {
+      initializeRecurringNotifications(loopItems);
+    }
+  }, [loopItems]);
+
+  // Schedule task-specific notifications whenever tasks change
+  useEffect(() => {
+    if (tasks.length > 0) {
+      scheduleAllTaskNotifications(tasks);
+    }
+  }, [tasks]);
 
   if (isLoading) {
     return (

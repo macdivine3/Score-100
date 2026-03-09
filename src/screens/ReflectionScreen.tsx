@@ -10,7 +10,7 @@ interface ReflectionScreenProps {
 }
 
 const ReflectionScreen: React.FC<ReflectionScreenProps> = ({ onFinish }) => {
-    const { currentScore, journalEntry, closeDay } = useApp();
+    const { currentScore, journalEntry, closeDay, weeklyAverage, streakCount } = useApp();
     const [reflection, setReflection] = useState(journalEntry);
     const prompt = getTodaysPrompt();
 
@@ -31,6 +31,30 @@ const ReflectionScreen: React.FC<ReflectionScreenProps> = ({ onFinish }) => {
                 >
                     <View style={styles.ringSection}>
                         <ScoreRing score={currentScore} />
+
+                        <View style={styles.statsRow}>
+                            <View style={styles.statItem}>
+                                <Text style={styles.statLabel}>7-DAY AVG</Text>
+                                <Text style={[styles.statValue, { color: weeklyAverage >= 90 ? COLORS.success : COLORS.textPrimary }]}>
+                                    {weeklyAverage}
+                                </Text>
+                            </View>
+                            <View style={styles.statDivider} />
+                            <View style={styles.statItem}>
+                                <Text style={styles.statLabel}>STREAK</Text>
+                                <View style={styles.streakRow}>
+                                    <Text style={styles.statValue}>{streakCount}</Text>
+                                    <Text style={styles.streakFire}>🔥</Text>
+                                </View>
+                            </View>
+                        </View>
+
+                        {weeklyAverage >= 95 && (
+                            <View style={styles.perfectWeekBadge}>
+                                <Text style={styles.perfectWeekEmoji}>💎</Text>
+                                <Text style={styles.perfectWeekText}>PERFECT WEEK</Text>
+                            </View>
+                        )}
                     </View>
 
                     <View style={styles.reflectionCard}>
@@ -81,6 +105,69 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         justifyContent: 'center',
         marginBottom: SIZES.xl,
+        marginTop: SIZES.md,
+    },
+    statsRow: {
+        flexDirection: 'row',
+        justifyContent: 'center',
+        alignItems: 'center',
+        paddingVertical: SIZES.md,
+        backgroundColor: 'rgba(255,255,255,0.04)',
+        width: '100%',
+        borderRadius: SIZES.radiusMd,
+        marginTop: SIZES.lg,
+        borderWidth: 1,
+        borderColor: 'rgba(255,255,255,0.05)',
+    },
+    statItem: {
+        flex: 1,
+        alignItems: 'center',
+    },
+    statDivider: {
+        width: 1,
+        height: 24,
+        backgroundColor: 'rgba(255,255,255,0.1)',
+    },
+    statLabel: {
+        color: COLORS.textMuted,
+        fontSize: 10,
+        fontWeight: '700',
+        letterSpacing: 1,
+        marginBottom: 4,
+    },
+    statValue: {
+        color: COLORS.textPrimary,
+        fontSize: 18,
+        fontWeight: '800',
+    },
+    streakRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+    },
+    streakFire: {
+        fontSize: 14,
+        marginLeft: 4,
+    },
+    perfectWeekBadge: {
+        marginTop: SIZES.md,
+        backgroundColor: 'rgba(59, 130, 246, 0.1)',
+        paddingHorizontal: SIZES.md,
+        paddingVertical: 6,
+        borderRadius: 20,
+        flexDirection: 'row',
+        alignItems: 'center',
+        borderWidth: 1,
+        borderColor: 'rgba(59, 130, 246, 0.2)',
+    },
+    perfectWeekEmoji: {
+        fontSize: 12,
+        marginRight: 6,
+    },
+    perfectWeekText: {
+        color: COLORS.accent,
+        fontSize: 10,
+        fontWeight: '800',
+        letterSpacing: 1,
     },
     reflectionCard: {
         width: '100%',

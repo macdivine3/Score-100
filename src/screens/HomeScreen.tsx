@@ -2,7 +2,9 @@ import React from 'react';
 import { View, Text, StyleSheet, ScrollView, Pressable, SafeAreaView } from 'react-native';
 import { COLORS, SIZES } from '../constants/theme';
 import { useApp } from '../context/AppContext';
-import { ProgressHeader, TaskCard, TheLoopSection } from '../components';
+import { ProgressHeader, TaskCard, TheLoopSection, ScoreRing } from '../components';
+import Animated, { useSharedValue, withRepeat, withTiming, withSpring, useAnimatedStyle, interpolate } from 'react-native-reanimated';
+import { useEffect } from 'react';
 
 interface HomeScreenProps {
     onAddTask: () => void;
@@ -10,19 +12,24 @@ interface HomeScreenProps {
 }
 
 const HomeScreen: React.FC<HomeScreenProps> = ({ onAddTask, onCompleteDay }) => {
-    const { tasks, dayStatus, startDay, totalPlanned } = useApp();
+    const { tasks, currentScore, yesterdayScore, dayStatus, totalPlanned, startDay, completeTask, skipTask, loopItems, loopChecks, weeklyAverage, streakCount } = useApp();
 
     const isPlanning = dayStatus === 'planning';
     const isActive = dayStatus === 'active';
 
+    // Critical State: Score under 50% or missed a habit
+    const uncheckedLoopCount = loopItems.filter(item => !loopChecks[item.id]).length;
+    const isCritical = isActive && (currentScore < 50 || uncheckedLoopCount > 0);
+
     // Smart Sorting Logic
     const sortedTasks = React.useMemo(() => {
         const parseTimeToMinutes = (timeStr: string) => {
+            if (!timeStr) return 0;
             const [time, period] = timeStr.split(' ');
             let [hours, minutes] = time.split(':').map(Number);
             if (period === 'PM' && hours !== 12) hours += 12;
             if (period === 'AM' && hours === 12) hours = 0;
-            return hours * 60 + minutes;
+            return hours * 60 + (minutes || 0);
         };
 
         const now = new Date();
@@ -36,8 +43,8 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ onAddTask, onCompleteDay }) => 
 
             // Priority 2: For incomplete tasks, check if time has passed
             if (!a.completed) {
-                const timeA = parseTimeToMinutes(a.time);
-                const timeB = parseTimeToMinutes(b.time);
+                const timeA = parseTimeToMinutes(a.startTime);
+                const timeB = parseTimeToMinutes(b.startTime);
                 const isAPassed = timeA < currentMinutes;
                 const isBPassed = timeB < currentMinutes;
 
@@ -50,7 +57,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ onAddTask, onCompleteDay }) => 
             }
 
             // For both completed tasks: keep original time order
-            return parseTimeToMinutes(a.time) - parseTimeToMinutes(b.time);
+            return parseTimeToMinutes(a.startTime) - parseTimeToMinutes(b.startTime);
         });
     }, [tasks]);
 
@@ -91,6 +98,8 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ onAddTask, onCompleteDay }) => 
                                         key={task.id}
                                         task={task}
                                         index={index}
+                                        onComplete={() => completeTask(task.id)}
+                                        onSkip={() => skipTask(task.id)}
                                         isLast={index === sortedTasks.length - 1}
                                     />
                                 ))}
@@ -125,11 +134,74 @@ const styles = StyleSheet.create({
     },
     tasksSectionHeader: {
         paddingHorizontal: SIZES.lg,
-        marginTop: SIZES.md,
+        marginTop: SIZES.sm,
         paddingBottom: SIZES.xs,
     },
+    statsRow: {
+        flexDirection: 'row',
+        justifyContent: 'center',
+        alignItems: 'center',
+        paddingVertical: SIZES.sm,
+        backgroundColor: 'rgba(255,255,255,0.03)',
+        marginHorizontal: SIZES.xl,
+        borderRadius: SIZES.radiusMd,
+        marginTop: -SIZES.md,
+        zIndex: 11,
+    },
+    statItem: {
+        flex: 1,
+        alignItems: 'center',
+    },
+    statDivider: {
+        width: 1,
+        height: 20,
+        backgroundColor: 'rgba(255,255,255,0.1)',
+    },
+    statLabel: {
+        color: COLORS.textMuted,
+        fontSize: 8,
+        fontWeight: '700',
+        letterSpacing: 1,
+        marginBottom: 2,
+    },
+    statValue: {
+        color: COLORS.textPrimary,
+        fontSize: SIZES.fontMd,
+        fontWeight: '800',
+    },
+    streakRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+    },
+    streakFire: {
+        fontSize: 12,
+        marginLeft: 2,
+    },
+    perfectWeekBadge: {
+        position: 'absolute',
+        top: 20,
+        right: SIZES.xl,
+        backgroundColor: 'rgba(59, 130, 246, 0.1)',
+        paddingHorizontal: SIZES.sm,
+        paddingVertical: 4,
+        borderRadius: 12,
+        flexDirection: 'row',
+        alignItems: 'center',
+        borderWidth: 1,
+        borderColor: 'rgba(59, 130, 246, 0.2)',
+    },
+    perfectWeekEmoji: {
+        fontSize: 10,
+        marginRight: 4,
+    },
+    perfectWeekText: {
+        color: COLORS.accent,
+        fontSize: 8,
+        fontWeight: '800',
+        letterSpacing: 0.5,
+    },
     taskListContainer: {
-        height: 360, // Fits roughly 4 cards
+        flex: 1,
     },
     scrollView: {
         flex: 1,

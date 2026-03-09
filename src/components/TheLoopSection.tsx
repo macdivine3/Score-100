@@ -28,6 +28,7 @@ const TheLoopSection: React.FC<TheLoopSectionProps> = ({
     const [editingItem, setEditingItem] = useState<LoopItem | null>(null);
     const [editName, setEditName] = useState('');
     const [editTime, setEditTime] = useState('');
+    const [editInterval, setEditInterval] = useState('');
 
     const handleToggle = (itemId: string) => {
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -38,14 +39,21 @@ const TheLoopSection: React.FC<TheLoopSectionProps> = ({
         setEditingItem(item);
         setEditName(item.name);
         setEditTime(item.time);
+        setEditInterval(item.intervalHours?.toString() || '');
         setEditModalVisible(true);
     };
 
     const handleSaveEdit = () => {
         if (!editingItem || !editName.trim()) return;
+        const interval = parseInt(editInterval);
         const updated = loopItems.map(item =>
             item.id === editingItem.id
-                ? { ...item, name: editName.trim(), time: editTime.trim() }
+                ? {
+                    ...item,
+                    name: editName.trim(),
+                    time: editTime.trim(),
+                    intervalHours: isNaN(interval) ? undefined : interval
+                }
                 : item
         );
         updateLoopItems(updated);
@@ -86,7 +94,9 @@ const TheLoopSection: React.FC<TheLoopSectionProps> = ({
 
                     <View style={styles.headerRow}>
                         <Text style={styles.title}>THE LOOP</Text>
-                        <Text style={styles.subtitle}>NON-NEGOTIABLES</Text>
+                        <View style={styles.subtitleRow}>
+                            <Text style={styles.subtitle}>{dayStatus === 'planning' ? 'NON-NEGOTIABLES' : 'PENALTY: -5 PTS EACH'}</Text>
+                        </View>
                     </View>
 
                     {expanded && (
@@ -110,6 +120,11 @@ const TheLoopSection: React.FC<TheLoopSectionProps> = ({
                                         ]}>
                                             {loopChecks[item.id] && <Text style={styles.checkmark}>✓</Text>}
                                         </View>
+                                        {!loopChecks[item.id] && dayStatus !== 'planning' && (
+                                            <View style={styles.penaltyBadge}>
+                                                <Text style={styles.penaltyBadgeText}>-5</Text>
+                                            </View>
+                                        )}
                                         <Text
                                             numberOfLines={1}
                                             style={[
@@ -119,7 +134,10 @@ const TheLoopSection: React.FC<TheLoopSectionProps> = ({
                                         >
                                             {item.name}
                                         </Text>
-                                        <Text style={styles.itemTime}>{item.time}</Text>
+                                        <Text style={styles.itemTime}>
+                                            {item.time}
+                                            {item.intervalHours ? ` (Every ${item.intervalHours}h)` : ''}
+                                        </Text>
                                     </Pressable>
                                 ))}
 
@@ -130,19 +148,41 @@ const TheLoopSection: React.FC<TheLoopSectionProps> = ({
                                     <Text style={styles.addHabitLabel}>Add Habit</Text>
                                 </Pressable>
                             </ScrollView>
+
+                            {dayStatus === 'active' && (
+                                <View style={styles.expandedBottomActions}>
+                                    <Pressable style={styles.secondaryCloseBtn} onPress={onCloseDay}>
+                                        <Text style={styles.secondaryCloseText}>Close & Reflect</Text>
+                                    </Pressable>
+                                </View>
+                            )}
                         </View>
                     )}
 
                     <View style={styles.bottomActions}>
                         {dayStatus === 'planning' ? (
+                            <>
+                                <Pressable style={styles.addTasksButton} onPress={onAddTask}>
+                                    <Text style={styles.addTasksButtonText}>+ Add Tasks</Text>
+                                </Pressable>
+                                {totalPlanned > 0 && (
+                                    <Pressable
+                                        style={styles.startDayButton}
+                                        onPress={onStartDay}
+                                    >
+                                        <Text style={styles.startDayText}>
+                                            🚀 Start Day
+                                        </Text>
+                                    </Pressable>
+                                )}
+                            </>
+                        ) : dayStatus === 'active' ? (
                             <Pressable style={styles.addTasksButton} onPress={onAddTask}>
                                 <Text style={styles.addTasksButtonText}>+ Add Tasks</Text>
                             </Pressable>
-                        ) : (dayStatus === 'active' || dayStatus === 'completed') ? (
+                        ) : dayStatus === 'completed' ? (
                             <Pressable style={styles.closeDayButton} onPress={onCloseDay}>
-                                <Text style={styles.closeDayText}>
-                                    {dayStatus === 'active' ? 'Close & Reflect' : 'Day Summary'}
-                                </Text>
+                                <Text style={styles.closeDayText}>Day Summary</Text>
                             </Pressable>
                         ) : null}
                     </View>
@@ -168,8 +208,16 @@ const TheLoopSection: React.FC<TheLoopSectionProps> = ({
                                 style={styles.modalInput}
                                 value={editTime}
                                 onChangeText={setEditTime}
-                                placeholder="Time (e.g. 06:00 AM)"
+                                placeholder="Start Time (e.g. 06:00 AM)"
                                 placeholderTextColor={COLORS.textMuted}
+                            />
+                            <TextInput
+                                style={styles.modalInput}
+                                value={editInterval}
+                                onChangeText={setEditInterval}
+                                placeholder="Interval (Optional, e.g. 3 for every 3h)"
+                                placeholderTextColor={COLORS.textMuted}
+                                keyboardType="numeric"
                             />
                             <View style={styles.modalButtons}>
                                 <Pressable style={styles.deleteBtn} onPress={() => editingItem && handleDeleteItem(editingItem.id)}>
@@ -261,10 +309,13 @@ const styles = StyleSheet.create({
         fontWeight: '800',
         letterSpacing: 1,
     },
+    subtitleRow: {
+        marginLeft: 'auto',
+        alignItems: 'flex-end',
+    },
     subtitle: {
         color: COLORS.textMuted,
         fontSize: 9,
-        marginLeft: 'auto',
         letterSpacing: 1,
         fontWeight: '600',
     },
@@ -288,6 +339,23 @@ const styles = StyleSheet.create({
         width: 105,
         borderWidth: 1,
         borderColor: 'rgba(255,255,255,0.08)',
+        position: 'relative',
+    },
+    penaltyBadge: {
+        position: 'absolute',
+        top: 6,
+        right: 6,
+        backgroundColor: 'rgba(255,0,0,0.1)',
+        paddingHorizontal: 4,
+        paddingVertical: 1,
+        borderRadius: 4,
+        borderWidth: 1,
+        borderColor: 'rgba(255,0,0,0.2)',
+    },
+    penaltyBadgeText: {
+        color: COLORS.danger,
+        fontSize: 8,
+        fontWeight: '800',
     },
     addHabitCard: {
         backgroundColor: 'rgba(255,255,255,0.02)',
@@ -449,6 +517,47 @@ const styles = StyleSheet.create({
     saveBtnText: {
         color: '#fff',
         fontWeight: '700',
+    },
+    startDayButton: {
+        backgroundColor: COLORS.accent,
+        paddingVertical: SIZES.md,
+        borderRadius: SIZES.radiusLg,
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginTop: SIZES.sm,
+    },
+    startDayButtonDisabled: {
+        backgroundColor: 'rgba(255,255,255,0.05)',
+        borderWidth: 1,
+        borderColor: 'rgba(255,255,255,0.08)',
+    },
+    startDayText: {
+        color: '#FFFFFF',
+        fontSize: SIZES.fontMd,
+        fontWeight: '700',
+        letterSpacing: 0.5,
+    },
+    startDayTextDisabled: {
+        color: COLORS.textMuted,
+    },
+    expandedBottomActions: {
+        paddingHorizontal: SIZES.lg,
+        paddingBottom: SIZES.md,
+        alignItems: 'center',
+    },
+    secondaryCloseBtn: {
+        width: '100%',
+        paddingVertical: SIZES.md,
+        borderRadius: SIZES.radiusMd,
+        borderWidth: 1,
+        borderColor: 'rgba(255,255,255,0.08)',
+        backgroundColor: 'rgba(255,255,255,0.03)',
+        alignItems: 'center',
+    },
+    secondaryCloseText: {
+        color: COLORS.textSecondary,
+        fontSize: 14,
+        fontWeight: '600',
     },
 });
 

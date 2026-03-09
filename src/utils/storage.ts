@@ -8,19 +8,26 @@ const KEYS = {
     SCORES: 'score100_scores',
     JOURNAL: 'score100_journal',
     DAY_STATUS: 'score100_day_status',
+    LAST_OPEN: 'score100_last_open',
 };
 
-// Get today's date key (e.g. "2026-02-23")
-export const getTodayKey = () => format(new Date(), 'yyyy-MM-dd');
+// Get date key (e.g. "2026-02-23")
+export const getDateKey = (date: Date = new Date()) => format(date, 'yyyy-MM-dd');
+export const getTodayKey = () => getDateKey(new Date());
+export const getTomorrowKey = () => {
+    const tomorrow = new Date();
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    return getDateKey(tomorrow);
+};
 
 // Tasks
-export const saveTasks = async (tasks: Task[]) => {
-    const key = `${KEYS.TASKS}_${getTodayKey()}`;
+export const saveTasks = async (tasks: Task[], dateKey: string = getTodayKey()) => {
+    const key = `${KEYS.TASKS}_${dateKey}`;
     await AsyncStorage.setItem(key, JSON.stringify(tasks));
 };
 
-export const loadTasks = async (): Promise<Task[]> => {
-    const key = `${KEYS.TASKS}_${getTodayKey()}`;
+export const loadTasks = async (dateKey: string = getTodayKey()): Promise<Task[]> => {
+    const key = `${KEYS.TASKS}_${dateKey}`;
     const data = await AsyncStorage.getItem(key);
     return data ? JSON.parse(data) : [];
 };
@@ -40,13 +47,13 @@ export const loadLoop = async (): Promise<LoopItem[]> => {
 };
 
 // Save today's checked status for loop items
-export const saveLoopChecks = async (checks: Record<string, boolean>) => {
-    const key = `${KEYS.LOOP}_checks_${getTodayKey()}`;
+export const saveLoopChecks = async (checks: Record<string, boolean>, dateKey: string = getTodayKey()) => {
+    const key = `${KEYS.LOOP}_checks_${dateKey}`;
     await AsyncStorage.setItem(key, JSON.stringify(checks));
 };
 
-export const loadLoopChecks = async (): Promise<Record<string, boolean>> => {
-    const key = `${KEYS.LOOP}_checks_${getTodayKey()}`;
+export const loadLoopChecks = async (dateKey: string = getTodayKey()): Promise<Record<string, boolean>> => {
+    const key = `${KEYS.LOOP}_checks_${dateKey}`;
     const data = await AsyncStorage.getItem(key);
     return data ? JSON.parse(data) : {};
 };
@@ -84,13 +91,22 @@ export const loadJournal = async (): Promise<string> => {
 };
 
 // Day Status
-export const saveDayStatus = async (status: DayStatus) => {
-    const key = `${KEYS.DAY_STATUS}_${getTodayKey()}`;
+export const saveDayStatus = async (status: DayStatus, dateKey: string = getTodayKey()) => {
+    const key = `${KEYS.DAY_STATUS}_${dateKey}`;
     await AsyncStorage.setItem(key, status);
 };
 
-export const loadDayStatus = async (): Promise<DayStatus> => {
-    const key = `${KEYS.DAY_STATUS}_${getTodayKey()}`;
+export const loadDayStatus = async (dateKey: string = getTodayKey()): Promise<DayStatus> => {
+    const key = `${KEYS.DAY_STATUS}_${dateKey}`;
     const data = await AsyncStorage.getItem(key) as DayStatus | null;
     return data || 'planning';
+};
+
+// Last Open Date
+export const saveLastOpenDate = async (date: string) => {
+    await AsyncStorage.setItem(KEYS.LAST_OPEN, date);
+};
+
+export const loadLastOpenDate = async (): Promise<string | null> => {
+    return await AsyncStorage.getItem(KEYS.LAST_OPEN);
 };

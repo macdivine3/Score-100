@@ -2,7 +2,9 @@ export interface Task {
     id: string;
     name: string;
     points: number;
-    time: string;
+    priority: number; // 1-10
+    startTime: string;
+    endTime: string;
     completed: boolean;
     skipped?: boolean;
 }
@@ -11,6 +13,7 @@ export interface LoopItem {
     id: string;
     name: string;
     time: string;
+    intervalHours?: number;
 }
 
 export type DayStatus = 'planning' | 'active' | 'completed';
@@ -22,10 +25,14 @@ export interface AppContextType {
     currentScore: number;
     totalPlanned: number;
     yesterdayScore: number | null;
+    weeklyAverage: number;
+    streakCount: number;
     journalEntry: string;
     dayStatus: DayStatus;
     isLoading: boolean;
     addTask: (task: Omit<Task, 'id' | 'completed'>) => Promise<void>;
+    setTasks: (tasks: Task[]) => Promise<void>;
+    setTasksForDate: (tasks: Task[], dateKey: string) => Promise<void>;
     removeTask: (taskId: string) => Promise<void>;
     completeTask: (taskId: string) => Promise<void>;
     skipTask: (taskId: string) => Promise<void>;
