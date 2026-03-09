@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, StyleSheet, ScrollView, Pressable, SafeAreaView } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, Pressable, SafeAreaView, Alert } from 'react-native';
 import { COLORS, SIZES } from '../constants/theme';
 import { useApp } from '../context/AppContext';
 import { ProgressHeader, TaskCard, TheLoopSection, ScoreRing } from '../components';
@@ -12,7 +12,7 @@ interface HomeScreenProps {
 }
 
 const HomeScreen: React.FC<HomeScreenProps> = ({ onAddTask, onCompleteDay }) => {
-    const { tasks, currentScore, yesterdayScore, dayStatus, totalPlanned, startDay, completeTask, skipTask, loopItems, loopChecks, weeklyAverage, streakCount } = useApp();
+    const { tasks, currentScore, yesterdayScore, dayStatus, totalPlanned, startDay, completeTask, skipTask, loopItems, loopChecks, weeklyAverage, streakCount, resetDay } = useApp();
 
     const isPlanning = dayStatus === 'planning';
     const isActive = dayStatus === 'active';
@@ -20,6 +20,21 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ onAddTask, onCompleteDay }) => 
     // Critical State: Score under 50% or missed a habit
     const uncheckedLoopCount = loopItems.filter(item => !loopChecks[item.id]).length;
     const isCritical = isActive && (currentScore < 50 || uncheckedLoopCount > 0);
+
+    const handleReset = () => {
+        Alert.alert(
+            "Reset Day",
+            "This will clear all tasks and reset your progress for today. Are you sure?",
+            [
+                { text: "Cancel", style: "cancel" },
+                {
+                    text: "Reset",
+                    style: "destructive",
+                    onPress: () => resetDay()
+                }
+            ]
+        );
+    };
 
     // Smart Sorting Logic
     const sortedTasks = React.useMemo(() => {
@@ -69,7 +84,14 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ onAddTask, onCompleteDay }) => 
                     <ProgressHeader />
                     <View style={styles.tasksSectionHeader}>
                         <View style={styles.sectionHeader}>
-                            <Text style={styles.sectionTitle}>Today's Tasks</Text>
+                            <View style={styles.titleRow}>
+                                <Text style={styles.sectionTitle}>Today's Tasks</Text>
+                                {tasks.length > 0 && (
+                                    <Pressable onPress={handleReset} style={styles.resetTextBtn}>
+                                        <Text style={styles.resetText}>RESET</Text>
+                                    </Pressable>
+                                )}
+                            </View>
                             {!isPlanning && tasks.length > 0 && (
                                 <Text style={styles.swipeHint}>Swipe to complete</Text>
                             )}
@@ -219,6 +241,21 @@ const styles = StyleSheet.create({
         color: COLORS.textPrimary,
         fontSize: SIZES.fontXl,
         fontWeight: '700',
+    },
+    titleRow: {
+        flexDirection: 'row',
+        alignItems: 'baseline',
+        gap: SIZES.sm,
+    },
+    resetTextBtn: {
+        paddingHorizontal: SIZES.sm,
+        paddingVertical: 4,
+    },
+    resetText: {
+        color: COLORS.danger,
+        fontSize: 10,
+        fontWeight: '800',
+        letterSpacing: 1,
     },
     swipeHint: {
         color: COLORS.textMuted,

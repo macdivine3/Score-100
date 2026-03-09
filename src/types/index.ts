@@ -14,6 +14,7 @@ export interface LoopItem {
     name: string;
     time: string;
     intervalHours?: number;
+    icon?: string;
 }
 
 export type DayStatus = 'planning' | 'active' | 'completed';
@@ -40,5 +41,6 @@ export interface AppContextType {
     updateLoopItems: (items: LoopItem[]) => Promise<void>;
     startDay: () => Promise<void>;
     closeDay: (journal: string) => Promise<void>;
+    resetDay: () => Promise<void>;
     setJournalEntry: (entry: string) => void;
 }

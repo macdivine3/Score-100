@@ -7,6 +7,16 @@ import { LoopItem } from '../types';
 
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 
+const PRESETS = [
+    { name: 'Hydration', icon: '💧', interval: 3, time: '08:00 AM' },
+    { name: 'Movement', icon: '👟', interval: 4, time: '09:00 AM' },
+    { name: 'Deep Work', icon: '🧘', interval: undefined, time: '09:00 AM' },
+    { name: 'Reading', icon: '📖', interval: undefined, time: '08:00 PM' },
+    { name: 'Journal', icon: '✍️', interval: undefined, time: '07:00 AM' },
+];
+
+const EMOJIS = ['💧', '👟', '🧘', '📖', '✍️', '🍎', '💪', '💊', '🔋', '🎯'];
+
 interface TheLoopSectionProps {
     onAddTask: () => void;
     onStartDay: () => void;
@@ -22,13 +32,14 @@ const TheLoopSection: React.FC<TheLoopSectionProps> = ({
     dayStatus,
     totalPlanned
 }) => {
-    const { loopItems, loopChecks, toggleLoopCheck, updateLoopItems } = useApp();
+    const { loopItems, loopChecks, toggleLoopCheck, updateLoopItems, resetDay } = useApp();
     const [expanded, setExpanded] = useState(false);
     const [editModalVisible, setEditModalVisible] = useState(false);
     const [editingItem, setEditingItem] = useState<LoopItem | null>(null);
     const [editName, setEditName] = useState('');
     const [editTime, setEditTime] = useState('');
     const [editInterval, setEditInterval] = useState('');
+    const [editIcon, setEditIcon] = useState('✨');
 
     const handleToggle = (itemId: string) => {
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -40,39 +51,74 @@ const TheLoopSection: React.FC<TheLoopSectionProps> = ({
         setEditName(item.name);
         setEditTime(item.time);
         setEditInterval(item.intervalHours?.toString() || '');
+        setEditIcon(item.icon || '✨');
         setEditModalVisible(true);
     };
 
     const handleSaveEdit = () => {
-        if (!editingItem || !editName.trim()) return;
+        if (!editName.trim()) return;
         const interval = parseInt(editInterval);
-        const updated = loopItems.map(item =>
-            item.id === editingItem.id
-                ? {
-                    ...item,
-                    name: editName.trim(),
-                    time: editTime.trim(),
-                    intervalHours: isNaN(interval) ? undefined : interval
-                }
-                : item
-        );
+
+        let updated: LoopItem[];
+        if (editingItem) {
+            // Update existing
+            updated = loopItems.map(item =>
+                item.id === editingItem.id
+                    ? {
+                        ...item,
+                        name: editName.trim(),
+                        time: editTime.trim(),
+                        intervalHours: isNaN(interval) ? undefined : interval,
+                        icon: editIcon
+                    }
+                    : item
+            );
+        } else {
+            // Add new
+            const newItem: LoopItem = {
+                id: Date.now().toString(),
+                name: editName.trim(),
+                time: editTime.trim(),
+                intervalHours: isNaN(interval) ? undefined : interval,
+                icon: editIcon
+            };
+            updated = [...loopItems, newItem];
+        }
+
         updateLoopItems(updated);
         setEditModalVisible(false);
+        setEditingItem(null);
     };
 
     const handleAddItem = () => {
-        const newItem: LoopItem = {
-            id: Date.now().toString(),
-            name: 'New Habit',
-            time: '08:00 AM',
-        };
-        updateLoopItems([...loopItems, newItem]);
+        setEditingItem(null);
+        setEditName('');
+        setEditTime('08:00 AM');
+        setEditInterval('');
+        setEditIcon('✨');
+        setEditModalVisible(true);
     };
 
     const handleDeleteItem = (itemId: string) => {
         const updated = loopItems.filter(item => item.id !== itemId);
         updateLoopItems(updated);
         setEditModalVisible(false);
+    };
+
+    const handleResetRhythms = () => {
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+        const defaults: LoopItem[] = [
+            { id: '1', name: 'Hydration', time: '08:00 AM', icon: '💧', intervalHours: 3 },
+            { id: '2', name: 'Movement', time: '09:00 AM', icon: '👟', intervalHours: 4 },
+            { id: '3', name: 'Journal', time: '07:00 AM', icon: '✍️' },
+        ];
+        updateLoopItems(defaults);
+    };
+
+    const handleResetDay = () => {
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+        resetDay();
+        setExpanded(false);
     };
 
     return (
@@ -114,29 +160,22 @@ const TheLoopSection: React.FC<TheLoopSectionProps> = ({
                                         onPress={() => handleToggle(item.id)}
                                         onLongPress={() => handleEditItem(item)}
                                     >
-                                        <View style={[
-                                            styles.checkbox,
-                                            loopChecks[item.id] && styles.checkboxChecked,
-                                        ]}>
-                                            {loopChecks[item.id] && <Text style={styles.checkmark}>✓</Text>}
+                                        <View style={styles.itemHeader}>
+                                            <Text style={styles.itemIcon}>{item.icon || '✨'}</Text>
+                                            <View style={[
+                                                styles.checkbox,
+                                                loopChecks[item.id] && styles.checkboxChecked,
+                                            ]}>
+                                                {loopChecks[item.id] && <Text style={styles.checkmark}>✓</Text>}
+                                            </View>
                                         </View>
                                         {!loopChecks[item.id] && dayStatus !== 'planning' && (
                                             <View style={styles.penaltyBadge}>
                                                 <Text style={styles.penaltyBadgeText}>-5</Text>
                                             </View>
                                         )}
-                                        <Text
-                                            numberOfLines={1}
-                                            style={[
-                                                styles.itemName,
-                                                loopChecks[item.id] && styles.itemNameChecked,
-                                            ]}
-                                        >
-                                            {item.name}
-                                        </Text>
                                         <Text style={styles.itemTime}>
-                                            {item.time}
-                                            {item.intervalHours ? ` (Every ${item.intervalHours}h)` : ''}
+                                            {item.intervalHours ? `Every ${item.intervalHours}h` : item.time}
                                         </Text>
                                     </Pressable>
                                 ))}
@@ -149,10 +188,19 @@ const TheLoopSection: React.FC<TheLoopSectionProps> = ({
                                 </Pressable>
                             </ScrollView>
 
-                            {dayStatus === 'active' && (
+                            {(dayStatus === 'active' || dayStatus === 'completed') && (
                                 <View style={styles.expandedBottomActions}>
                                     <Pressable style={styles.secondaryCloseBtn} onPress={onCloseDay}>
-                                        <Text style={styles.secondaryCloseText}>Close & Reflect</Text>
+                                        <Text style={styles.secondaryCloseText}>
+                                            {dayStatus === 'active' ? 'Close & Reflect' : 'Day Summary'}
+                                        </Text>
+                                    </Pressable>
+                                    <Pressable style={styles.resetBtn} onPress={handleResetRhythms}>
+                                        <Text style={styles.resetBtnText}>Reset Rhythms</Text>
+                                    </Pressable>
+                                    <View style={styles.resetSeparator} />
+                                    <Pressable style={styles.resetBtn} onPress={handleResetDay}>
+                                        <Text style={[styles.resetBtnText, { color: COLORS.danger }]}>Reset My Day</Text>
                                     </Pressable>
                                 </View>
                             )}
@@ -176,62 +224,114 @@ const TheLoopSection: React.FC<TheLoopSectionProps> = ({
                                     </Pressable>
                                 )}
                             </>
-                        ) : dayStatus === 'active' ? (
+                        ) : (
                             <Pressable style={styles.addTasksButton} onPress={onAddTask}>
                                 <Text style={styles.addTasksButtonText}>+ Add Tasks</Text>
                             </Pressable>
-                        ) : dayStatus === 'completed' ? (
-                            <Pressable style={styles.closeDayButton} onPress={onCloseDay}>
-                                <Text style={styles.closeDayText}>Day Summary</Text>
-                            </Pressable>
-                        ) : null}
+                        )}
                     </View>
                 </View>
 
                 <Modal
                     visible={editModalVisible}
                     transparent
-                    animationType="fade"
+                    animationType="slide"
                     onRequestClose={() => setEditModalVisible(false)}
                 >
                     <View style={styles.modalOverlay}>
                         <View style={styles.modalContent}>
-                            <Text style={styles.modalTitle}>Edit Habit</Text>
-                            <TextInput
-                                style={styles.modalInput}
-                                value={editName}
-                                onChangeText={setEditName}
-                                placeholder="Habit name"
-                                placeholderTextColor={COLORS.textMuted}
-                            />
-                            <TextInput
-                                style={styles.modalInput}
-                                value={editTime}
-                                onChangeText={setEditTime}
-                                placeholder="Start Time (e.g. 06:00 AM)"
-                                placeholderTextColor={COLORS.textMuted}
-                            />
-                            <TextInput
-                                style={styles.modalInput}
-                                value={editInterval}
-                                onChangeText={setEditInterval}
-                                placeholder="Interval (Optional, e.g. 3 for every 3h)"
-                                placeholderTextColor={COLORS.textMuted}
-                                keyboardType="numeric"
-                            />
-                            <View style={styles.modalButtons}>
-                                <Pressable style={styles.deleteBtn} onPress={() => editingItem && handleDeleteItem(editingItem.id)}>
-                                    <Text style={styles.deleteBtnText}>Delete</Text>
+                            <View style={styles.modalHeader}>
+                                <Text style={styles.modalTitle}>Design Rhythm</Text>
+                                <Pressable onPress={() => setEditModalVisible(false)}>
+                                    <Text style={styles.modalCloseText}>Done</Text>
                                 </Pressable>
-                                <View style={{ flexDirection: 'row', gap: SIZES.sm }}>
-                                    <Pressable style={styles.cancelBtn} onPress={() => setEditModalVisible(false)}>
-                                        <Text style={styles.cancelBtnText}>Cancel</Text>
+                            </View>
+
+                            <ScrollView showsVerticalScrollIndicator={false}>
+                                {/* Preset Grid */}
+                                <Text style={styles.modalSublabel}>QUICK PRESETS</Text>
+                                <View style={styles.presetGrid}>
+                                    {PRESETS.map((p) => (
+                                        <Pressable
+                                            key={p.name}
+                                            style={styles.presetItem}
+                                            onPress={() => {
+                                                setEditName(p.name);
+                                                setEditIcon(p.icon);
+                                                setEditInterval(p.interval?.toString() || '');
+                                                setEditTime(p.time);
+                                            }}
+                                        >
+                                            <Text style={styles.presetIcon}>{p.icon}</Text>
+                                            <Text style={styles.presetLabel}>{p.name}</Text>
+                                        </Pressable>
+                                    ))}
+                                </View>
+
+                                {/* Emoji Picker */}
+                                <Text style={styles.modalSublabel}>IDENTITY</Text>
+                                <View style={styles.emojiRow}>
+                                    {EMOJIS.map(e => (
+                                        <Pressable
+                                            key={e}
+                                            onPress={() => setEditIcon(e)}
+                                            style={[styles.emojiBtn, editIcon === e && styles.emojiBtnActive]}
+                                        >
+                                            <Text style={styles.emojiBtnText}>{e}</Text>
+                                        </Pressable>
+                                    ))}
+                                </View>
+
+                                {/* Inputs */}
+                                <Text style={styles.modalSublabel}>DETAILS</Text>
+                                <TextInput
+                                    style={styles.modalInput}
+                                    value={editName}
+                                    onChangeText={setEditName}
+                                    placeholder="Habit name"
+                                    placeholderTextColor={COLORS.textMuted}
+                                />
+                                <View style={styles.modalInputRow}>
+                                    <View style={{ flex: 1 }}>
+                                        <Text style={styles.inputMiniLabel}>START TIME</Text>
+                                        <TextInput
+                                            style={styles.modalInput}
+                                            value={editTime}
+                                            onChangeText={setEditTime}
+                                            placeholder="06:00 AM"
+                                            placeholderTextColor={COLORS.textMuted}
+                                        />
+                                    </View>
+                                    <View style={{ flex: 1 }}>
+                                        <Text style={styles.inputMiniLabel}>INTERVAL (HRS)</Text>
+                                        <TextInput
+                                            style={styles.modalInput}
+                                            value={editInterval}
+                                            onChangeText={setEditInterval}
+                                            placeholder="e.g. 3"
+                                            placeholderTextColor={COLORS.textMuted}
+                                            keyboardType="numeric"
+                                        />
+                                    </View>
+                                </View>
+
+                                {editInterval && parseInt(editInterval) > 0 && (
+                                    <View style={styles.intervalSummary}>
+                                        <Text style={styles.summaryText}>
+                                            🚀 This rhythm will nudge you {Math.floor(16 / parseInt(editInterval))} times today.
+                                        </Text>
+                                    </View>
+                                )}
+
+                                <View style={styles.modalButtons}>
+                                    <Pressable style={styles.deleteBtn} onPress={() => editingItem && handleDeleteItem(editingItem.id)}>
+                                        <Text style={styles.deleteBtnText}>Delete Habit</Text>
                                     </Pressable>
                                     <Pressable style={styles.saveBtn} onPress={handleSaveEdit}>
-                                        <Text style={styles.saveBtnText}>Save</Text>
+                                        <Text style={styles.saveBtnText}>Save Rhythm</Text>
                                     </Pressable>
                                 </View>
-                            </View>
+                            </ScrollView>
                         </View>
                     </View>
                 </Modal>
@@ -261,23 +361,23 @@ const styles = StyleSheet.create({
         // No specific shift needed if handle is fixed
     },
     tray: {
-        backgroundColor: '#1E1E2E', // Solid opaque dark color
+        backgroundColor: '#1E1E2E',
         borderTopLeftRadius: SIZES.radiusXl,
         borderTopRightRadius: SIZES.radiusXl,
         borderWidth: 1,
         borderBottomWidth: 0,
         borderColor: 'rgba(255,255,255,0.1)',
-        paddingBottom: SIZES.xs, // Reduced padding for anchored look
+        paddingBottom: SIZES.xs,
     },
     handleWrapper: {
         alignItems: 'center',
-        marginTop: -15, // Lift the pill handle so it overlaps the border
+        marginTop: -15,
         marginBottom: SIZES.sm,
     },
     pillHandle: {
         width: 60,
         height: 30,
-        backgroundColor: 'rgba(45, 45, 65, 1)', // Dark solid pill as per image
+        backgroundColor: 'rgba(45, 45, 65, 1)',
         borderRadius: 15,
         alignItems: 'center',
         justifyContent: 'center',
@@ -333,13 +433,23 @@ const styles = StyleSheet.create({
     itemCard: {
         backgroundColor: 'rgba(255,255,255,0.04)',
         borderRadius: SIZES.radiusMd,
-        paddingVertical: SIZES.md,
-        paddingHorizontal: SIZES.md,
+        paddingVertical: SIZES.sm,
+        paddingHorizontal: SIZES.sm,
         alignItems: 'center',
-        width: 105,
+        width: 100,
         borderWidth: 1,
         borderColor: 'rgba(255,255,255,0.08)',
         position: 'relative',
+    },
+    itemHeader: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        width: '100%',
+        alignItems: 'center',
+        marginBottom: SIZES.xs,
+    },
+    itemIcon: {
+        fontSize: 16,
     },
     penaltyBadge: {
         position: 'absolute',
@@ -360,43 +470,42 @@ const styles = StyleSheet.create({
     addHabitCard: {
         backgroundColor: 'rgba(255,255,255,0.02)',
         borderRadius: SIZES.radiusMd,
-        paddingVertical: SIZES.md,
-        paddingHorizontal: SIZES.md,
+        paddingVertical: SIZES.sm,
+        paddingHorizontal: SIZES.sm,
         alignItems: 'center',
-        width: 105,
+        width: 100,
         justifyContent: 'center',
         borderWidth: 1,
         borderColor: 'rgba(255,255,255,0.05)',
         borderStyle: 'dashed',
     },
     addHabitIcon: {
-        width: 20,
-        height: 20,
-        borderRadius: 10,
+        width: 16,
+        height: 16,
+        borderRadius: 8,
         backgroundColor: 'rgba(255,255,255,0.1)',
         alignItems: 'center',
         justifyContent: 'center',
-        marginBottom: SIZES.xs,
+        marginBottom: 4,
     },
     addHabitIconText: {
         color: COLORS.textSecondary,
-        fontSize: 12,
+        fontSize: 10,
         fontWeight: '700',
     },
     addHabitLabel: {
         color: COLORS.textMuted,
-        fontSize: 10,
+        fontSize: 9,
         fontWeight: '600',
     },
     checkbox: {
-        width: 18,
-        height: 18,
-        borderRadius: 9,
+        width: 14,
+        height: 14,
+        borderRadius: 7,
         borderWidth: 1.5,
         borderColor: COLORS.accent,
         alignItems: 'center',
         justifyContent: 'center',
-        marginBottom: SIZES.xs,
     },
     checkboxChecked: {
         backgroundColor: COLORS.accent,
@@ -405,15 +514,6 @@ const styles = StyleSheet.create({
         color: '#fff',
         fontSize: 9,
         fontWeight: '900',
-    },
-    itemName: {
-        color: COLORS.textPrimary,
-        fontSize: 12,
-        fontWeight: '600',
-    },
-    itemNameChecked: {
-        opacity: 0.5,
-        textDecorationLine: 'line-through',
     },
     itemTime: {
         color: COLORS.textMuted,
@@ -459,23 +559,89 @@ const styles = StyleSheet.create({
     modalOverlay: {
         flex: 1,
         backgroundColor: 'rgba(0,0,0,0.8)',
-        justifyContent: 'center',
-        alignItems: 'center',
-        padding: SIZES.lg,
+        justifyContent: 'flex-end',
     },
     modalContent: {
         backgroundColor: '#1E1E2E',
-        borderRadius: SIZES.radiusLg,
-        padding: SIZES.lg,
-        width: '100%',
+        borderTopLeftRadius: SIZES.radiusXl,
+        borderTopRightRadius: SIZES.radiusXl,
+        padding: SIZES.xl,
+        maxHeight: '90%',
         borderWidth: 1,
         borderColor: 'rgba(255,255,255,0.1)',
     },
+    modalHeader: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: SIZES.xl,
+    },
     modalTitle: {
         color: COLORS.textPrimary,
-        fontSize: SIZES.fontXl,
+        fontSize: 24,
+        fontWeight: '800',
+        letterSpacing: -0.5,
+    },
+    modalCloseText: {
+        color: COLORS.accent,
+        fontSize: 14,
         fontWeight: '700',
-        marginBottom: SIZES.lg,
+    },
+    modalSublabel: {
+        color: COLORS.textMuted,
+        fontSize: 10,
+        fontWeight: '800',
+        letterSpacing: 2,
+        marginBottom: SIZES.md,
+        marginTop: SIZES.sm,
+    },
+    presetGrid: {
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        gap: SIZES.sm,
+        marginBottom: SIZES.xl,
+    },
+    presetItem: {
+        backgroundColor: 'rgba(255,255,255,0.04)',
+        paddingVertical: SIZES.sm,
+        paddingHorizontal: SIZES.md,
+        borderRadius: SIZES.radiusMd,
+        alignItems: 'center',
+        borderWidth: 1,
+        borderColor: 'rgba(255,255,255,0.06)',
+        flexDirection: 'row',
+        gap: 8,
+    },
+    presetIcon: {
+        fontSize: 14,
+    },
+    presetLabel: {
+        color: COLORS.textPrimary,
+        fontSize: 12,
+        fontWeight: '600',
+    },
+    emojiRow: {
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        gap: SIZES.sm,
+        marginBottom: SIZES.xl,
+    },
+    emojiBtn: {
+        width: 44,
+        height: 44,
+        borderRadius: 22,
+        backgroundColor: 'rgba(255,255,255,0.03)',
+        alignItems: 'center',
+        justifyContent: 'center',
+        borderWidth: 1,
+        borderColor: 'rgba(255,255,255,0.05)',
+    },
+    emojiBtnActive: {
+        borderColor: COLORS.accent,
+        backgroundColor: 'rgba(59, 130, 246, 0.1)',
+    },
+    emojiBtnText: {
+        fontSize: 20,
     },
     modalInput: {
         backgroundColor: 'rgba(255,255,255,0.06)',
@@ -487,36 +653,57 @@ const styles = StyleSheet.create({
         borderWidth: 1,
         borderColor: 'rgba(255,255,255,0.08)',
     },
+    modalInputRow: {
+        flexDirection: 'row',
+        gap: SIZES.md,
+        marginBottom: SIZES.lg,
+    },
+    inputMiniLabel: {
+        color: COLORS.textMuted,
+        fontSize: 8,
+        fontWeight: '700',
+        marginBottom: 4,
+        letterSpacing: 1,
+    },
+    intervalSummary: {
+        backgroundColor: 'rgba(59, 130, 246, 0.1)',
+        padding: SIZES.md,
+        borderRadius: SIZES.radiusMd,
+        marginBottom: SIZES.xl,
+        borderWidth: 1,
+        borderColor: 'rgba(59, 130, 246, 0.2)',
+    },
+    summaryText: {
+        color: COLORS.accent,
+        fontSize: 13,
+        fontWeight: '600',
+        lineHeight: 18,
+    },
     modalButtons: {
         flexDirection: 'row',
         justifyContent: 'space-between',
-        marginTop: SIZES.sm,
-    },
-    deleteBtn: {
-        paddingVertical: SIZES.sm,
-        paddingHorizontal: SIZES.md,
-    },
-    deleteBtnText: {
-        color: COLORS.danger,
-        fontWeight: '600',
-    },
-    cancelBtn: {
-        paddingVertical: SIZES.sm,
-        paddingHorizontal: SIZES.md,
-    },
-    cancelBtnText: {
-        color: COLORS.textSecondary,
-        fontWeight: '600',
+        marginTop: SIZES.lg,
+        gap: SIZES.md,
     },
     saveBtn: {
         backgroundColor: COLORS.accent,
-        paddingVertical: SIZES.sm,
-        paddingHorizontal: SIZES.lg,
-        borderRadius: SIZES.radiusMd,
+        paddingVertical: SIZES.md,
+        borderRadius: SIZES.radiusLg,
+        alignItems: 'center',
+        flex: 2,
     },
     saveBtnText: {
         color: '#fff',
         fontWeight: '700',
+    },
+    deleteBtn: {
+        paddingVertical: SIZES.md,
+        alignItems: 'center',
+        flex: 1,
+    },
+    deleteBtnText: {
+        color: COLORS.danger,
+        fontWeight: '600',
     },
     startDayButton: {
         backgroundColor: COLORS.accent,
@@ -525,11 +712,6 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         justifyContent: 'center',
         marginTop: SIZES.sm,
-    },
-    startDayButtonDisabled: {
-        backgroundColor: 'rgba(255,255,255,0.05)',
-        borderWidth: 1,
-        borderColor: 'rgba(255,255,255,0.08)',
     },
     startDayText: {
         color: '#FFFFFF',
@@ -544,6 +726,9 @@ const styles = StyleSheet.create({
         paddingHorizontal: SIZES.lg,
         paddingBottom: SIZES.md,
         alignItems: 'center',
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        justifyContent: 'center',
     },
     secondaryCloseBtn: {
         width: '100%',
@@ -558,6 +743,23 @@ const styles = StyleSheet.create({
         color: COLORS.textSecondary,
         fontSize: 14,
         fontWeight: '600',
+    },
+    resetBtn: {
+        marginTop: SIZES.sm,
+        padding: SIZES.sm,
+    },
+    resetBtnText: {
+        color: COLORS.textMuted,
+        fontSize: 10,
+        fontWeight: '700',
+        textTransform: 'uppercase',
+        letterSpacing: 1.5,
+    },
+    resetSeparator: {
+        width: 1,
+        height: 12,
+        backgroundColor: 'rgba(255,255,255,0.1)',
+        marginHorizontal: SIZES.sm,
     },
 });
 

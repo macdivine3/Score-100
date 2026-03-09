@@ -208,6 +208,20 @@ export const AppProvider = ({ children }: AppProviderProps) => {
         ]);
     }, [currentScore]);
 
+    // Reset the day (Clear tasks and return to planning)
+    const resetDay = useCallback(async () => {
+        setTasksInternal([]);
+        setLoopChecks({});
+        setJournalEntry('');
+        setDayStatus('planning');
+        await Promise.all([
+            saveTasks([]),
+            saveLoopChecks({}),
+            saveJournal(''),
+            saveDayStatus('planning'),
+        ]);
+    }, []);
+
     return (
         <AppContext.Provider value={{
             tasks,
@@ -231,6 +245,7 @@ export const AppProvider = ({ children }: AppProviderProps) => {
             updateLoopItems,
             startDay,
             closeDay,
+            resetDay,
             setJournalEntry,
         }}>
             {children}

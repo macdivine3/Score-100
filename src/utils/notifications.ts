@@ -197,7 +197,7 @@ const parseTimeToDate = (timeStr: string): Date | null => {
  * Schedule "Habit Late Reminders" — fires 1 hour after the habit's scheduled time.
  * If intervalHours is set, it schedules a recurring reminder every X hours.
  */
-export const scheduleHabitLateReminders = async (loopItems: { id: string; name: string; time: string; intervalHours?: number }[]) => {
+export const scheduleHabitLateReminders = async (loopItems: { id: string; name: string; time: string; intervalHours?: number; icon?: string }[]) => {
     // Cancel any existing habit reminders
     const scheduled = await Notifications.getAllScheduledNotificationsAsync();
     for (const notif of scheduled) {
@@ -208,40 +208,55 @@ export const scheduleHabitLateReminders = async (loopItems: { id: string; name: 
     }
 
     for (const item of loopItems) {
-        if (item.intervalHours && item.intervalHours > 0) {
-            // Recurring Interval Nudge (e.g. Every 3 hours)
+        const iconPrefix = item.icon ? `${item.icon} ` : '';
+
+        // 1. Always schedule the Daily Target Nudge (Fires at item.time)
+        const fireDate = parseTimeToDate(item.time);
+        if (fireDate) {
+            // Schedule the "Daily Start" notification
             await Notifications.scheduleNotificationAsync({
                 content: {
-                    title: '➰ Loop Rhythm',
-                    body: `Time for your "${item.name}" habit. Keep the rhythm.`,
-                    data: { tag: `habit-late-${item.id}` },
+                    title: `${iconPrefix}${item.name}`,
+                    body: `Time to start your daily rhythm for "${item.name}". 💎`,
+                    data: { tag: `habit-late-${item.id}-start` },
+                },
+                trigger: {
+                    type: Notifications.SchedulableTriggerInputTypes.DAILY,
+                    hour: fireDate.getHours(),
+                    minute: fireDate.getMinutes(),
+                },
+            });
+
+            // 2. Schedule the Late Check-In (1 hour after)
+            const lateDate = new Date(fireDate);
+            lateDate.setHours(lateDate.getHours() + 1);
+            if (lateDate > new Date()) {
+                await Notifications.scheduleNotificationAsync({
+                    content: {
+                        title: `📈 ${item.name} Check-In`,
+                        body: `Did you complete your "${item.name}" habit? Don't let the score tax hit you.`,
+                        data: { tag: `habit-late-${item.id}-late` },
+                    },
+                    trigger: {
+                        type: Notifications.SchedulableTriggerInputTypes.DATE,
+                        date: lateDate,
+                    },
+                });
+            }
+        }
+
+        // 3. Schedule the Recurring Interval Nudge (if specified)
+        if (item.intervalHours && item.intervalHours > 0) {
+            await Notifications.scheduleNotificationAsync({
+                content: {
+                    title: `${iconPrefix}Loop Rhythm`,
+                    body: `Rhythm reminder: Time for "${item.name}". 🌊`,
+                    data: { tag: `habit-late-${item.id}-interval` },
                 },
                 trigger: {
                     type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL,
                     seconds: item.intervalHours * 3600,
                     repeats: true,
-                },
-            });
-        } else {
-            // Single Daily Late Reminder
-            const fireDate = parseTimeToDate(item.time);
-            if (!fireDate) continue;
-
-            // 1 hour after
-            fireDate.setHours(fireDate.getHours() + 1);
-
-            // Don't schedule if the time has already passed today
-            if (fireDate <= new Date()) continue;
-
-            await Notifications.scheduleNotificationAsync({
-                content: {
-                    title: '📈 Habit Check-In',
-                    body: `Did you complete your "${item.name}" habit? Don't let the score tax hit you.`,
-                    data: { tag: `habit-late-${item.id}` },
-                },
-                trigger: {
-                    type: Notifications.SchedulableTriggerInputTypes.DATE,
-                    date: fireDate,
                 },
             });
         }
