@@ -7,7 +7,7 @@ import {
     saveJournal, loadJournal,
     saveDayStatus, loadDayStatus,
     saveLastOpenDate, loadLastOpenDate,
-    getTodayKey, getDateKey,
+    getTodayKey, getDateKey, getTomorrowKey,
 } from '../utils/storage';
 import { Task, LoopItem, DayStatus, AppContextType } from '../types';
 
@@ -34,6 +34,7 @@ export const AppProvider = ({ children }: AppProviderProps) => {
     const [journalEntry, setJournalEntry] = useState('');
     const [dayStatus, setDayStatus] = useState<DayStatus>('planning');
     const [isLoading, setIsLoading] = useState(true);
+    const [hasTomorrowTasks, setHasTomorrowTasks] = useState(false);
 
     // Weekly average (last 7 days including today)
     const calculateWeeklyAverage = useCallback(() => {
@@ -102,7 +103,7 @@ export const AppProvider = ({ children }: AppProviderProps) => {
                     console.log('Welcome to a new day! Score 100 reset.');
                 }
 
-                const [loadedTasks, loadedLoop, loadedChecks, loadedYesterday, loadedScores, loadedJournal, loadedStatus] = await Promise.all([
+                const [loadedTasks, loadedLoop, loadedChecks, loadedYesterday, loadedScores, loadedJournal, loadedStatus, loadedTomorrowTasks] = await Promise.all([
                     loadTasks(),
                     loadLoop(),
                     loadLoopChecks(),
@@ -110,6 +111,7 @@ export const AppProvider = ({ children }: AppProviderProps) => {
                     loadScores(),
                     loadJournal(),
                     loadDayStatus(),
+                    loadTasks(getTomorrowKey()),
                 ]);
 
                 setTasksInternal(loadedTasks);
@@ -119,6 +121,7 @@ export const AppProvider = ({ children }: AppProviderProps) => {
                 setScoreHistory(loadedScores);
                 setJournalEntry(loadedJournal);
                 setDayStatus(loadedStatus);
+                setHasTomorrowTasks(loadedTomorrowTasks.length > 0);
 
                 await saveLastOpenDate(today);
             } catch (e) {
@@ -147,6 +150,8 @@ export const AppProvider = ({ children }: AppProviderProps) => {
     const setTasksForDate = useCallback(async (newTasks: Task[], dateKey: string) => {
         if (dateKey === getTodayKey()) {
             setTasksInternal(newTasks);
+        } else if (dateKey === getTomorrowKey()) {
+            setHasTomorrowTasks(newTasks.length > 0);
         }
         await saveTasks(newTasks, dateKey);
         // When setting tasks, the status should be set to 'active' for that day
@@ -235,6 +240,7 @@ export const AppProvider = ({ children }: AppProviderProps) => {
             journalEntry,
             dayStatus,
             isLoading,
+            hasTomorrowTasks,
             addTask,
             setTasks,
             setTasksForDate,

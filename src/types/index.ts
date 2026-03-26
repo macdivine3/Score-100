@@ -31,6 +31,7 @@ export interface AppContextType {
     journalEntry: string;
     dayStatus: DayStatus;
     isLoading: boolean;
+    hasTomorrowTasks: boolean;
     addTask: (task: Omit<Task, 'id' | 'completed'>) => Promise<void>;
     setTasks: (tasks: Task[]) => Promise<void>;
     setTasksForDate: (tasks: Task[], dateKey: string) => Promise<void>;

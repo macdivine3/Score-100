@@ -12,7 +12,7 @@ interface HomeScreenProps {
 }
 
 const HomeScreen: React.FC<HomeScreenProps> = ({ onAddTask, onCompleteDay }) => {
-    const { tasks, currentScore, yesterdayScore, dayStatus, totalPlanned, startDay, completeTask, skipTask, loopItems, loopChecks, weeklyAverage, streakCount, resetDay } = useApp();
+    const { tasks, currentScore, yesterdayScore, dayStatus, totalPlanned, startDay, completeTask, skipTask, loopItems, loopChecks, weeklyAverage, streakCount, resetDay, hasTomorrowTasks } = useApp();
 
     const isPlanning = dayStatus === 'planning';
     const isActive = dayStatus === 'active';
@@ -108,9 +108,18 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ onAddTask, onCompleteDay }) => 
                     >
                         {tasks.length === 0 ? (
                             <View style={styles.emptyTasks}>
-                                <Text style={styles.emptyText}>No tasks planned yet.</Text>
-                                {isPlanning && (
-                                    <Text style={styles.emptySubtext}>Add targets to reach 100 points.</Text>
+                                {hasTomorrowTasks ? (
+                                    <>
+                                        <Text style={styles.emptyText}>All set for tomorrow.</Text>
+                                        <Text style={styles.emptySubtext}>Get some rest! 🌙</Text>
+                                    </>
+                                ) : (
+                                    <>
+                                        <Text style={styles.emptyText}>No tasks planned yet.</Text>
+                                        {isPlanning && (
+                                            <Text style={styles.emptySubtext}>Add targets to reach 100 points.</Text>
+                                        )}
+                                    </>
                                 )}
                             </View>
                         ) : (

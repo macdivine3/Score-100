@@ -235,7 +235,9 @@ const AddTaskScreen: React.FC<AddTaskScreenProps> = ({ onBack }) => {
                     </View>
 
                     <Pressable onPress={handleFinishPlanning} style={styles.doneButton}>
-                        <Text style={styles.doneText}>Start</Text>
+                        <Text style={styles.doneText}>
+                            {selection === 'tomorrow' ? 'Save for Tomorrow' : 'Start Day'}
+                        </Text>
                     </Pressable>
                 </View>
 
